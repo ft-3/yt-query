@@ -8,94 +8,107 @@ import (
 	"strings"
 	"io/ioutil"
 	"encoding/json"
+	"strconv"
+	"os/exec"
 )
 
 
 // Data type to store results from api query
 type Results struct {
-	Items     []Item           `json:"items"`
-	Id        map[string]string `json:"id"`
-	Snippet   map[string]string `json:"snippet"`
+	Items []Item `json:"items"`
 }
 
 type Item struct {
-	Id      map[string]string      `json:"id"`
+	Id      map[string]string `json:"id"`
 	Snippet map[string]string `json:"snippet"`
 }
 
-//func (i *Items) UnmarshalJSON(b []byte) (err error) {
-	
+// Wrappers to extract id ex.: -tqZZmF5wlI or video title
+func (r *Results) giveId(sel int) string {
+	return r.Items[sel].Id["videoId"]
+}
 
+func (r *Results) giveTitle(sel int) string {
+	return r.Items[sel].Snippet["title"]
+}
+
+// Loop over items and print titles
+func (r *Results) printResults() {
+	for i, item := range r.Items {
+		fmt.Printf("%2d <--> %s\n", i, item.Snippet["title"])
+	}
+}
+
+func makeQuery() (Results, error) {
+	// Read search
+	text := readInput("Enter search term: ")
+	str := translateToUrl(text)
+
+	//Server query
+	resp, err := http.Get(str)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	defer resp.Body.Close()
+
+	// Convert body to []byte
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	var result Results
+	json.Unmarshal(body, &result)
+
+	return result, nil
+}
+
+// Removes spaces from entered query, substitutes them with %20, and returns
+// link to hooktube api with read query.
 func translateToUrl(url string) string {
 	url = strings.TrimSpace(url)
 	newUrl := strings.Replace(url, " ", "%20", -1)
 	return "https://hooktube.com/api?mode=search&q=" + newUrl
 }
 
-func readInput() string {
+
+// Wrapper function to read user query with specified label
+func readInput(query string) string {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter search term: ")
+	fmt.Print(query)
 	text, _ := reader.ReadString('\n')
-	return text
+	return strings.Trim(text, " \n")
 }
 
-// Have to figure out a way to pull things out of the items field in the response.
-// Thinking about doing a json.RawMessage type, and making my own decoder for it
+
+// Returns the user chosen video as int
+func chooseVideo() (int, error) {
+	selection := readInput("Id of video to play (0 - 49): ")
+	if sel, err := strconv.Atoi(selection); err == nil {
+		return sel, nil
+	} else {
+	return 0, err
+	}
+}
+
+
+func idToLink(id string) string {
+	return "https://hooktube.com/watch?v=" + id
+}
+
 
 
 func main() {
-	text := readInput()
-	str := translateToUrl(text)
-	resp, err := http.Get(str)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
+	result, _ := makeQuery()
+	result.printResults()
 
-	// Close the body when function ends
-	defer resp.Body.Close()
-
-	// Convert body to []byte
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	// DEBUG
-	reader := bufio.NewReader(os.Stdin)
-
-	var structured Results
-	//var result interface{}
-	//json.Unmarshal(body, &result)
-
-	json.Unmarshal(body, &structured)
-
-	for i, item := range structured.Items {
-		fmt.Println(">>", i, "<<")
-		fmt.Println("ID -->", item.Id)
-		fmt.Println("SNIPPET -->", item.Snippet)
-		reader.ReadString('\n')
-	}
-
-	//m := structured.Items.(map[string]interface{})
-/*
-	fmt.Println(structured)
-	fmt.Println(structured.Id)
-	fmt.Println(structured.Snippet)
-	for k, v := range m {
-		switch vv := v.(type) {
-		case string:
-			fmt.Println(k, "is string")
-
-		case float64:
-			fmt.Println(k, "is float")
-
-		case []interface{}:
-			fmt.Println(k, "is an array")
-			for i, u := range vv {
-				fmt.Println(i, u)
-				reader.ReadString('\n')
-			}
-		default:
-			fmt.Println(k, "dunno m8")
+	for {
+		sel, err := chooseVideo()
+		if err != nil {
+			return 
 		}
-		reader.ReadString('\n')
+		id := result.giveId(sel)
+		link := idToLink(id)
+		title := result.giveTitle(sel)
+
+		fmt.Println("Playing:", title, "<", link, ">")
+		exec.Command("mpv", "--no-video", link).Run()
 	}
-*/
 }
