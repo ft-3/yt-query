@@ -13,11 +13,18 @@ import (
 
 // Data type to store results from api query
 type Results struct {
-	PageToken string  `json:"nextPageToken"`
-	Id map[string]string `json:"id"`
+	Items     []Item           `json:"items"`
+	Id        map[string]string `json:"id"`
+	Snippet   map[string]string `json:"snippet"`
+}
+
+type Item struct {
+	Id      map[string]string      `json:"id"`
 	Snippet map[string]string `json:"snippet"`
 }
 
+//func (i *Items) UnmarshalJSON(b []byte) (err error) {
+	
 
 func translateToUrl(url string) string {
 	url = strings.TrimSpace(url)
@@ -51,24 +58,26 @@ func main() {
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	// DEBUG
-//	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 
 	var structured Results
-/*
-	var result interface{}
-	json.Unmarshal(body, &result)
-*/
+	//var result interface{}
+	//json.Unmarshal(body, &result)
+
 	json.Unmarshal(body, &structured)
 
-	fmt.Println(structured.PageToken)
+	for i, item := range structured.Items {
+		fmt.Println(">>", i, "<<")
+		fmt.Println("ID -->", item.Id)
+		fmt.Println("SNIPPET -->", item.Snippet)
+		reader.ReadString('\n')
+	}
 
 	//m := structured.Items.(map[string]interface{})
-	//m := structured.Items.([]interface{})
-
+/*
 	fmt.Println(structured)
 	fmt.Println(structured.Id)
 	fmt.Println(structured.Snippet)
-/*
 	for k, v := range m {
 		switch vv := v.(type) {
 		case string:
